@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Templates</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-iYQeCzEYFbKjA/T2uDLTpkwGzCiq6soy8tYaI1GyVh/UjpbCx/TYkiZhlZB6+fzT"
+      crossorigin="anonymous"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.14.1/moment.min.js"></script>
+    <script>
+      function onDelete(id) {
+        // are you sure prompt
+        if (
+          confirm(
+            "Are you sure you want to delete this template? This can affect your sending if csv files reference it in the future."
+          )
+        ) {
+          // Confirmed
+          // delete api call
+          fetch(`/api/templates/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: "",
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              console.log("result:", data);
+              if (data.success == true && data.deleted == "1") {
+                document.getElementById(`templateCard-${id}`).remove();
+              }
+            })
+            .catch((e) => console.error(e));
+        } else {
+          // Do nothing!
+          console.log("Not confirmed.");
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col">
+          <h1>
+            Templates
+            <span class="float-end"
+              ><a
+                class="btn btn-outline-primary btn-sm"
+                href="/templates/new"
+                role="button"
+                >New Template</a
+              ></span
+            >
+          </h1>
+
+          <div class="row">
+            <% templates.forEach(function(template){ %>
+            <div class="col-md-4" id="templateCard-<%= template.id %>">
+              <div class="card m-1">
+                <div class="card-header">
+                  <h5 class="card-title">ID: <%- template.id %></h5>
+                </div>
+                <div class="card-body">
+                  <p class="card-text">
+                    <b>Sender ID Feld: </b><%- template.senderIdField %>
+                  </p>
+                  <p class="card-text">
+                    <b>Template Text: </b><%- template.text %>
+                  </p>
+                  <div class="card-text">
+                    <a
+                      href="#"
+                      class="btn btn-outline-danger btn-sm"
+                      onclick="onDelete('<%= template.id %>')"
+                      >Löschen</a
+                    >
+                    <a href="#" class="btn btn-outline-primary btn-sm disabled"
+                      >Editieren</a
+                    >
+                  </div>
+                </div>
+                <div class="card-footer">
+                  <small class="text-muted"
+                    >Letzte Änderung:
+                    <span class="isoDate"
+                      ><%- template.updatedAt %></span
+                    ></small
+                  ><br />
+                </div>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      document
+        .querySelectorAll('span[class="isoDate"]')
+        .forEach(
+          (el) =>
+            (el.textContent = moment(el.textContent).format("DD.MM.YY HH:mm"))
+        );
+    </script>
+  </body>
+</html>
