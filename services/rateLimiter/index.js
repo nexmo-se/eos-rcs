@@ -53,7 +53,11 @@ const newInstance = (tps) => {
 
   return {
     get: (url, requestConfig) => bottleneckInstance.schedule(() => originalAxiosInstance.get(url, requestConfig)),
-    post: (url, body, requestConfig) => bottleneckInstance.schedule(() => originalAxiosInstance.post(url, body, requestConfig)),
+    post: (
+      url,
+      body,
+      requestConfig // Fixed: headers are part of requestConfig
+    ) => bottleneckInstance.schedule(() => originalAxiosInstance.post(url, body, requestConfig)),
     put: (url, body, requestConfig) => bottleneckInstance.schedule(() => originalAxiosInstance.put(url, body, requestConfig)),
     delete: (url, body, requestConfig) => bottleneckInstance.schedule(() => originalAxiosInstance.delete(url, body, requestConfig)),
   };

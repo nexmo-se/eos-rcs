@@ -1,1 +1,6 @@
 neru.yml
+node_modules
+local/
+vcr.yml
+private.key
+local/

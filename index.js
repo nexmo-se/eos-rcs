@@ -118,6 +118,11 @@ app.get('/api/templates', async (req, res) => {
   });
   res.json(parsedTemplates);
 });
+app.get('/support', async (req, res) => {
+  const isRcsSupported = await utils.checkRCS('34628124767');
+  console.log(isRcsSupported);
+  res.send('okay');
+});
 
 // Get a single temaplte by id
 app.get('/api/templates/:id', async (req, res) => {
@@ -132,24 +137,25 @@ app.get('/api/templates/:id', async (req, res) => {
 
 // Create a new template
 app.post('/api/templates', async (req, res) => {
-  const { id, text, senderIdField } = req.body;
+  const { id, text, senderIdField, rcsEnabled } = req.body;
   let newTemplate;
   const updatedAt = new Date().toISOString();
   if (id && text && senderIdField) {
-    newTemplate = { id, text, senderIdField };
+    newTemplate = { id, text, senderIdField, rcsEnabled };
     const created = await globalState.hset(TEMPLATES_TABLENAME, {
-      [id]: JSON.stringify({ id, text, senderIdField, updatedAt }),
+      [id]: JSON.stringify({ id, text, senderIdField, updatedAt, rcsEnabled }),
     });
     res.json({ created, newTemplate });
   } else if (!id && text && senderIdField) {
     let id = uuid();
-    newTemplate = { id, text, senderIdField };
+    newTemplate = { id, text, senderIdField, rcsEnabled };
     const created = await globalState.hset(TEMPLATES_TABLENAME, {
       [id]: JSON.stringify({
         id,
         text,
         senderIdField,
         updatedAt,
+        rcsEnabled,
       }),
     });
     res.json({ created, newTemplate });
@@ -255,16 +261,6 @@ async function processAllFiles(files, assets, scheduler) {
     if (secondsTillEndOfDay > secondsNeededToSend && utils.timeNow() >= 7) {
       try {
         await globalState.set('processingState', true);
-        try {
-          interval = setInterval(() => {
-            axios.get(`http://${process.env.INSTANCE_SERVICE_NAME}.neru/keepalive`);
-          }, 1000);
-          // const schedulers = await scheduler.listAll().execute();
-          // // if (schedulers.list.indexOf('keepalive') !== -1)
-          // await keepAlive.createKeepAlive();
-        } catch (e) {
-          console.log('the scheduler already exists');
-        }
         const newCheck = new Date().toISOString();
         const savedNewCheck = await globalState.set('lastCsvCheck', newCheck);
         console.log(`There are ${secondsTillEndOfDay} sec left and I need ${secondsNeededToSend}`);
@@ -272,7 +268,7 @@ async function processAllFiles(files, assets, scheduler) {
         console.log('file name: ' + filename);
         const sendingResults = await smsService.sendAllMessages(records, filename);
         const endProcessingDate = new Date().toISOString();
-        const failedResults = sendingResults.filter((result) => result.status !== '0');
+        const failedResults = sendingResults.filter((result) => result.type);
         const failedSummary = [
           {
             failed: failedResults.length,
@@ -325,7 +321,7 @@ async function processAllFiles(files, assets, scheduler) {
         const startProcessingDate = new Date().toISOString();
         const sendingResults = await smsService.sendAllMessages(sendingRecords, filename);
         const endProcessingDate = new Date().toISOString();
-        const failedResults = sendingResults.filter((result) => result.status !== '0');
+        const failedResults = sendingResults.filter((result) => result.title);
         const failedSummary = [
           {
             failed: failedResults.length,
@@ -445,54 +441,15 @@ app.listen(process.env.NERU_APP_PORT || 3000, async () => {
   //   .execute();
   // console.log(schedulerCreated);
 
-  const email = process.env.email1;
+  const email = 'root@gmail.com';
   await globalState.hset('users', {
     [email]: JSON.stringify({
       id: uuidv4(),
       email: email,
       name: 'Test',
-      password: process.env.password1,
+      password: '1234',
     }),
   });
-  await globalState.hset('users', {
-    [process.env.email_2]: JSON.stringify({
-      id: uuidv4(),
-      email: process.env.email_2,
-      name: 'Test',
-      password: process.env.password_2,
-    }),
-  });
-  await globalState.hset('users', {
-    [process.env.email_3]: JSON.stringify({
-      id: uuidv4(),
-      email: process.env.email_3,
-      name: 'Test',
-      password: process.env.password_3,
-    }),
-  });
-  await globalState.hset('users', {
-    [process.env.email_4]: JSON.stringify({
-      id: uuidv4(),
-      email: process.env.email_4,
-      name: 'Test',
-      password: process.env.password_4,
-    }),
-  });
-  await globalState.hset('users', {
-    [process.env.email_5]: JSON.stringify({
-      id: uuidv4(),
-      email: process.env.email_5,
-      name: 'Test',
-      password: process.env.password_5,
-    }),
-  });
-  await globalState.hset('users', {
-    [process.env.email_6]: JSON.stringify({
-      id: uuidv4(),
-      email: process.env.email_6,
-      name: 'Test',
-      password: process.env.password_6,
-    }),
-  });
+
   await globalState.set('processingState', false);
 });

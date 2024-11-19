@@ -15,11 +15,12 @@ const isUnicode = (text) => /[^\u0000-\u00ff]/.test(text);
 const rateLimiterService = require('../rateLimiter/index');
 const tps = parseInt(process.env.tps || '30', 10);
 const rateLimitAxios = rateLimiterService.newInstance(tps);
+const utils = require('../../utils');
 // neru tablename for processed filenames
 const { neru, Assets, Scheduler } = require('neru-alpha');
 const apikey = process.env.apikey;
 const apiSecret = process.env.apiSecret;
-const api_url = 'https://rest.nexmo.com/sms/json';
+const api_url = 'https://api.nexmo.com/v1/messages';
 const globalState = neru.getGlobalState();
 
 const sendAllMessages = async (records, filename) => {
@@ -35,6 +36,7 @@ const sendAllMessages = async (records, filename) => {
       try {
         const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME]);
         let text = template?.text;
+
         const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`;
 
         const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`;
@@ -49,11 +51,13 @@ const sendAllMessages = async (records, filename) => {
             text = text.replaceAll(array[0], record[`${array[1]}`]);
           });
         }
+
         const client_ref_obj = { client_ref: client_ref };
         // Add to queue
-        const result = await sendSms(senderNumber, to, text, apikey, apiSecret, api_url, client_ref, csvName, rateLimitAxios);
 
-        return Promise.resolve(Object.assign({}, result.messages[0], client_ref_obj));
+        const result = await sendSmsOrRcs(to, text, api_url, client_ref, csvName, rateLimitAxios);
+        console.log(result);
+        return Promise.resolve(Object.assign({}, result, client_ref_obj));
       } catch (error) {
         return Promise.reject(error);
       }
@@ -66,24 +70,31 @@ const sendAllMessages = async (records, filename) => {
   }
 };
 
-const sendSms = (from, to, text, apiKey, apiSecret, apiUrl, campaignName, csvName, axios) => {
+const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios) => {
   // Determine proper type to send as
-  const type = isUnicode(text) ? 'unicode' : 'text';
+
+  const headers = {
+    Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
+    'Content-Type': 'application/json',
+  };
+
+  const isRcsSupported = await utils.checkRCS(to);
+  const channel = isRcsSupported ? 'rcs' : 'sms';
+  const from = isRcsSupported ? utils.rcsAgent : 'test';
 
   // Constructing the API Request Body
   const body = {
-    api_key: apiKey,
-    api_secret: apiSecret,
+    message_type: 'text',
     from: from,
+    channel: channel,
     to: to,
     text: text,
-    type,
-    'client-ref': campaignName,
-    'account-ref': csvName,
+    sms: { encoding_type: 'auto' },
+    client_ref: `${campaignName}-${csvName}`,
   };
 
   return axios
-    .post(apiUrl, body)
+    .post(apiUrl, body, { headers })
     .then((response) => {
       const { data } = response;
       return Promise.resolve(data);
@@ -95,7 +106,7 @@ const sendSms = (from, to, text, apiKey, apiSecret, apiUrl, campaignName, csvNam
         console.log('Too many request (429) detected, put back into queue');
 
         // Recursively call self, to put request back into queue
-        return sendSms(from, to, text, apiKey, apiSecret, apiUrl, campaignName, axios);
+        return sendSmsOrRcs(to, text, channel, apiUrl, campaignName, csvName, axios);
       }
 
       console.error(error.message);
@@ -105,6 +116,6 @@ const sendSms = (from, to, text, apiKey, apiSecret, apiUrl, campaignName, csvNam
 };
 
 module.exports = {
-  sendSms,
+  sendSmsOrRcs,
   sendAllMessages,
 };

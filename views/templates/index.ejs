@@ -13,33 +13,31 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.14.1/moment.min.js"></script>
     <script>
       function onDelete(id) {
-        // are you sure prompt
+        // Are you sure prompt
         if (
-          confirm(
-            "Are you sure you want to delete this template? This can affect your sending if csv files reference it in the future."
-          )
+          confirm('Are you sure you want to delete this template? This can affect your sending if CSV files reference it in the future.')
         ) {
           // Confirmed
-          // delete api call
+          // Delete API call
           fetch(`/api/templates/${id}`, {
-            method: "DELETE",
+            method: 'DELETE',
             headers: {
-              Authorization: "",
-              Accept: "application/json",
-              "Content-Type": "application/json",
+              Authorization: '',
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
             },
           })
             .then((response) => response.json())
             .then((data) => {
-              console.log("result:", data);
-              if (data.success == true && data.deleted == "1") {
+              console.log('result:', data);
+              if (data.success == true && data.deleted == '1') {
                 document.getElementById(`templateCard-${id}`).remove();
               }
             })
             .catch((e) => console.error(e));
         } else {
           // Do nothing!
-          console.log("Not confirmed.");
+          console.log('Not confirmed.');
         }
       }
     </script>
@@ -50,14 +48,7 @@
         <div class="col">
           <h1>
             Templates
-            <span class="float-end"
-              ><a
-                class="btn btn-outline-primary btn-sm"
-                href="/templates/new"
-                role="button"
-                >New Template</a
-              ></span
-            >
+            <span class="float-end"><a class="btn btn-outline-primary btn-sm" href="/templates/new" role="button">New Template</a></span>
           </h1>
 
           <div class="row">
@@ -68,30 +59,21 @@
                   <h5 class="card-title">ID: <%- template.id %></h5>
                 </div>
                 <div class="card-body">
-                  <p class="card-text">
-                    <b>Sender ID Feld: </b><%- template.senderIdField %>
-                  </p>
-                  <p class="card-text">
-                    <b>Template Text: </b><%- template.text %>
-                  </p>
-                  <div class="card-text">
-                    <a
-                      href="#"
-                      class="btn btn-outline-danger btn-sm"
-                      onclick="onDelete('<%= template.id %>')"
-                      >Löschen</a
-                    >
-                    <a href="#" class="btn btn-outline-primary btn-sm disabled"
-                      >Editieren</a
-                    >
+                  <p class="card-text"><b>Sender ID Field: </b><%- template.senderIdField %></p>
+                  <p class="card-text"><b>Template Text: </b><%- template.text %></p>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="rcsEnabled-<%= template.id %>" <%= template.rcsEnabled ? 'checked' :
+                    '' %> disabled />
+                    <label class="form-check-label" for="rcsEnabled-<%= template.id %>">RCS Enabled</label>
+                  </div>
+
+                  <div class="card-text mt-3">
+                    <a href="#" class="btn btn-outline-danger btn-sm" onclick="onDelete('<%= template.id %>')">Delete</a>
+                    <a href="#" class="btn btn-outline-primary btn-sm disabled">Edit</a>
                   </div>
                 </div>
                 <div class="card-footer">
-                  <small class="text-muted"
-                    >Letzte Änderung:
-                    <span class="isoDate"
-                      ><%- template.updatedAt %></span
-                    ></small
+                  <small class="text-muted">Last Updated: <span class="isoDate"><%- template.updatedAt %></span></small
                   ><br />
                 </div>
               </div>
@@ -110,10 +92,7 @@
     <script>
       document
         .querySelectorAll('span[class="isoDate"]')
-        .forEach(
-          (el) =>
-            (el.textContent = moment(el.textContent).format("DD.MM.YY HH:mm"))
-        );
+        .forEach((el) => (el.textContent = moment(el.textContent).format('DD.MM.YY HH:mm')));
     </script>
   </body>
 </html>

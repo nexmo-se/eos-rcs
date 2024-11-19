@@ -1,8 +1,16 @@
 const { DateTime } = require('luxon');
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const checkSenderIdValid = (senderId) => /^[a-zA-Z0-9]*$/gm.test(senderId);
+const { tokenGenerate } = require('@vonage/jwt');
+const fetch = require('node-fetch');
+const path = require('path');
+const fs = require('fs');
 
 const constants = require('./constants');
+
+const privateKey = fs.readFileSync(path.resolve('private.key'));
+const applicationId = 'fa25cf05-7862-4ebc-8ba3-1b73d63538b1';
+const rcsAgent = 'VonageSales';
 
 const secondsTillEndOfDay = () => {
   const now = DateTime.now().setZone('Europe/Berlin');
@@ -13,6 +21,32 @@ const secondsTillEndOfDay = () => {
 const timeNow = () => {
   const now = DateTime.now().setZone('Europe/Berlin');
   return now.c.hour;
+};
+
+const generateToken = () => {
+  return tokenGenerate(applicationId, privateKey, {
+    exp: Math.floor(Date.now() / 1000) + 8 * 60 * 60, // 8 hours
+  });
+};
+const checkRCS = async (to) => {
+  const host = 'https://api.nexmo.com';
+  const token = generateToken();
+  console.log(token);
+
+  const response = await fetch(`${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/phones/${to}/capabilities`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  console.log(response);
+
+  if (response.ok) {
+    return true;
+  }
+
+  return false;
 };
 
 const writeResults = async (results, path, header) => {
@@ -78,4 +112,7 @@ module.exports = {
   checkAuthenticated,
   checkNotAuthenticated,
   timeNow,
+  checkRCS,
+  generateToken,
+  rcsAgent,
 };
