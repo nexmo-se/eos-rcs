@@ -36,6 +36,7 @@ const sendAllMessages = async (records, filename) => {
       try {
         const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME]);
         let text = template?.text;
+        const rcsTemplate = template?.rcsEnabled;
 
         const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`;
 
@@ -55,7 +56,7 @@ const sendAllMessages = async (records, filename) => {
         const client_ref_obj = { client_ref: client_ref };
         // Add to queue
 
-        const result = await sendSmsOrRcs(to, text, api_url, client_ref, csvName, rateLimitAxios);
+        const result = await sendSmsOrRcs(to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate);
         console.log(result);
         return Promise.resolve(Object.assign({}, result, client_ref_obj));
       } catch (error) {
@@ -70,17 +71,19 @@ const sendAllMessages = async (records, filename) => {
   }
 };
 
-const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios) => {
+const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios, rcsTemplate) => {
   // Determine proper type to send as
-
+  let channel = 'sms';
+  let from = 'test';
   const headers = {
     Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
     'Content-Type': 'application/json',
   };
-
-  const isRcsSupported = await utils.checkRCS(to);
-  const channel = isRcsSupported ? 'rcs' : 'sms';
-  const from = isRcsSupported ? utils.rcsAgent : 'test';
+  if (rcsTemplate) {
+    const isRcsSupported = await utils.checkRCS(to);
+    channel = isRcsSupported ? 'rcs' : 'sms';
+    from = isRcsSupported ? utils.rcsAgent : from;
+  }
 
   // Constructing the API Request Body
   const body = {
@@ -106,7 +109,7 @@ const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios) => {
         console.log('Too many request (429) detected, put back into queue');
 
         // Recursively call self, to put request back into queue
-        return sendSmsOrRcs(to, text, channel, apiUrl, campaignName, csvName, axios);
+        return sendSmsOrRcs(to, text, channel, apiUrl, campaignName, csvName, axios, rcsTemplate);
       }
 
       console.error(error.message);
