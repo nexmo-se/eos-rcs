@@ -9,6 +9,7 @@ const passport = require('passport');
 const tps = parseInt(process.env.tps || '30', 10);
 const cookieSession = require('cookie-session');
 const { neru, Assets, Scheduler } = require('neru-alpha');
+const whitelistRouter = require('./router/whitelist');
 
 const csvService = require('./services/csv');
 const smsService = require('./services/sms');
@@ -17,6 +18,7 @@ const keepAlive = require('./services/keepalivescheduler');
 const utils = require('./utils');
 const initializePassport = require('./passport-strategy');
 const { default: axios } = require('axios');
+const blackListService = require('./services/blacklist');
 
 const globalState = neru.getGlobalState();
 const CRONJOB_DEFINITION_SCHEDULER = '0 9-20 * * 1-5';
@@ -60,6 +62,7 @@ initializePassport(
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.set('view engine', 'ejs');
+app.use('/whitelist', whitelistRouter());
 
 app.get('/_/health', async (req, res) => {
   res.sendStatus(200);
@@ -180,6 +183,26 @@ app.delete('/api/templates/:id', async (req, res) => {
 app.post('/keepalivepinger', async (req, res) => {
   const resp = await keepAlive.deleteKeepAlive();
   res.send(resp);
+});
+
+app.post('/inbound', async (req, res) => {
+  try {
+    if (req.body && req.body.from && req.body.text) {
+      const number = req.body.from;
+      const text = req.body.text;
+      if (text.toUpperCase() === 'STOP') {
+        const response = await blackListService.blacklist(number);
+        console.log(response);
+      }
+      console.log('message received', req.body);
+
+      res.sendStatus(200);
+    } else {
+      res.sendStatus(500);
+    }
+  } catch (e) {
+    res.sendStatus(500);
+  }
 });
 
 app.get('/checkTime', async (req, res) => {
