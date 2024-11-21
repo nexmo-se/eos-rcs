@@ -13,7 +13,7 @@ const isBlackListed = async (number) => {
     if (!number) throw new Error('no number provided');
 
     let isBlackListed = await db.mapGetValue(DB_TABLENAME_BLACKLIST, number.toString());
-    return res.json({ [number]: isBlackListed || false });
+    return isBlackListed || false;
   } catch (e) {
     console.log('blacklist check error:', e.response?.status, e.response?.data?.error, e.message);
   }

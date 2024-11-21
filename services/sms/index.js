@@ -16,6 +16,7 @@ const rateLimiterService = require('../rateLimiter/index');
 const tps = parseInt(process.env.tps || '30', 10);
 const rateLimitAxios = rateLimiterService.newInstance(tps);
 const utils = require('../../utils');
+const blackListService = require('../blacklist/index');
 // neru tablename for processed filenames
 const { neru, Assets, Scheduler } = require('neru-alpha');
 const apikey = process.env.apikey;
@@ -32,6 +33,10 @@ const sendAllMessages = async (records, filename) => {
   });
 
   try {
+    let smsCount = 0;
+    let rcsCount = 0;
+    let blackListed = 0;
+
     const promises = records.map(async (record) => {
       try {
         const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME]);
@@ -39,31 +44,37 @@ const sendAllMessages = async (records, filename) => {
         const rcsTemplate = template?.rcsEnabled;
 
         const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`;
-
         const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`;
         const client_ref = record[CSV_ID_COLUMN_NAME];
 
         const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g;
         if (text) {
-          // now, find all placeholders in the template text by using the regex above
           const matchArrays = [...text.matchAll(regexp)];
-          // for each placeholder, replace it with the value of the csv column that it references
           matchArrays.forEach((array) => {
             text = text.replaceAll(array[0], record[`${array[1]}`]);
           });
         }
 
         const client_ref_obj = { client_ref: client_ref };
-        // Add to queue
 
-        const result = await sendSmsOrRcs(to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate);
-        console.log(result);
+        const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate);
+
+        // Increment SMS or RCS count based on the channel
+        if (result.channel === 'sms') smsCount++;
+        if (result.channel === 'rcs') rcsCount++;
+        if (result.channel === 'blacklist') blackListed++;
+
         return Promise.resolve(Object.assign({}, result, client_ref_obj));
       } catch (error) {
         return Promise.reject(error);
       }
     });
+
     const results = await Promise.all(promises);
+
+    // Add SMS and RCS counts to results summary
+    results.push({ smsCount, rcsCount, blackListed });
+
     return results;
   } catch (error) {
     console.error(error);
@@ -71,21 +82,20 @@ const sendAllMessages = async (records, filename) => {
   }
 };
 
-const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios, rcsTemplate) => {
-  // Determine proper type to send as
-  let channel = 'sms';
-  let from = 'test';
+const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvName, axios, rcsTemplate) => {
+  let channel = 'sms'; // Default channel is SMS
+  let from = senderNumber || 'test';
   const headers = {
     Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
     'Content-Type': 'application/json',
   };
+
   if (rcsTemplate) {
     const isRcsSupported = await utils.checkRCS(to);
     channel = isRcsSupported ? 'rcs' : 'sms';
     from = isRcsSupported ? utils.rcsAgent : from;
   }
 
-  // Constructing the API Request Body
   const body = {
     message_type: 'text',
     from: from,
@@ -95,27 +105,29 @@ const sendSmsOrRcs = async (to, text, apiUrl, campaignName, csvName, axios, rcsT
     sms: { encoding_type: 'auto' },
     client_ref: `${campaignName}-${csvName}`,
   };
+  const isBlackListed = await blackListService.isBlackListed(to);
+  if (isBlackListed) {
+    return {
+      message_id: 'Blacklisted number - User sent STOP',
+      channel: 'blacklist',
+    };
+  }
 
-  return axios
-    .post(apiUrl, body, { headers })
-    .then((response) => {
-      const { data } = response;
-      return Promise.resolve(data);
-    })
-    .catch((error) => {
-      console.log(error);
-      // Check for 429: Too Many Requests
-      if (error.response != null && error.response.status === 429) {
-        console.log('Too many request (429) detected, put back into queue');
-
-        // Recursively call self, to put request back into queue
-        return sendSmsOrRcs(to, text, channel, apiUrl, campaignName, csvName, axios, rcsTemplate);
-      }
-
-      console.error(error.message);
-      console.error(error);
-      return Promise.reject(error);
-    });
+  try {
+    const response = await axios.post(apiUrl, body, { headers });
+    return {
+      ...response.data,
+      channel, // Include the channel in the returned object
+    };
+  } catch (error) {
+    console.error(error.response.data);
+    if (error.response != null && error.response.status === 429) {
+      console.log('Too many requests (429), retrying...');
+      // return sendSmsOrRcs(to, text, apiUrl, campaignName, csvName, axios, rcsTemplate);
+    }
+    return { ...error.response.data, channel };
+    // return Promise.reject(error);
+  }
 };
 
 module.exports = {

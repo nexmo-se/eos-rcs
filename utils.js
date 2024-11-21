@@ -31,7 +31,6 @@ const generateToken = () => {
 const checkRCS = async (to) => {
   const host = 'https://api.nexmo.com';
   const token = generateToken();
-  console.log(token);
 
   const response = await fetch(`${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/phones/${to}/capabilities`, {
     method: 'GET',
@@ -40,7 +39,6 @@ const checkRCS = async (to) => {
       'Content-Type': 'application/json',
     },
   });
-  console.log(response);
 
   if (response.ok) {
     return true;

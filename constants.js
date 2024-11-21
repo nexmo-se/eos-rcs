@@ -28,7 +28,7 @@ const resultsHeader = [
 
 const failedResultsHeader = [
   { id: 'client_ref', title: 'id' },
-  { id: 'error-text', title: 'error-text' },
+  { id: 'title', title: 'title' },
 ];
 
 const failedHeader = [
@@ -36,6 +36,9 @@ const failedHeader = [
   { id: 'successful', title: 'successful' },
   { id: 'startAt', title: 'startAt' },
   { id: 'endAt', title: 'endAt' },
+  { id: 'smsSent', title: 'smsSent' },
+  { id: 'rcsSent', title: 'rcsSent' },
+  { id: 'blackList', title: 'blackList' },
 ];
 
 module.exports = {

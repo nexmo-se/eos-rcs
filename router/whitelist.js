@@ -6,7 +6,6 @@ const DB_TABLENAME_BLACKLIST = 'DB_TABLENAME_BLACKLIST';
 
 module.exports = function Router() {
   const router = express.Router();
-  console.log(vcr);
 
   router.post('/', async (req, res, next) => {
     try {

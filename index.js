@@ -295,7 +295,11 @@ async function processAllFiles(files, assets, scheduler) {
         const failedSummary = [
           {
             failed: failedResults.length,
-            successful: sendingResults.length - failedResults.length,
+            //I need to consider the last object of the array which contains the sms/rcs breakdown
+            successful: sendingResults.length - failedResults.length - 1,
+            smsSent: sendingResults.at(-1).smsCount,
+            rcsSent: sendingResults.at(-1).rcsCount,
+            blackList: sendingResults.at(-1).blackListed,
             startAt: startProcessingDate,
             endAt: endProcessingDate,
           },
@@ -351,6 +355,8 @@ async function processAllFiles(files, assets, scheduler) {
             successful: sendingResults.length - failedResults.length,
             startAt: startProcessingDate,
             endAt: endProcessingDate,
+            smsSent: sendingResults.at(-1).smsCount,
+            rcsSent: sendingResults.at(-1).rcsCount,
           },
         ];
         //write the resuls file
