@@ -22,7 +22,7 @@ const { neru, Assets, Scheduler } = require('neru-alpha');
 const apikey = process.env.apikey;
 const apiSecret = process.env.apiSecret;
 const api_url = 'https://api.nexmo.com/v1/messages';
-const globalState = neru.getGlobalState();
+const globalState = neru.getAccountState();
 
 const sendAllMessages = async (records, filename) => {
   const csvName = filename.split('send/')[1];

@@ -8,9 +8,9 @@ const fs = require('fs');
 
 const constants = require('./constants');
 
-const privateKey = fs.readFileSync(path.resolve('private.key'));
-const applicationId = 'fa25cf05-7862-4ebc-8ba3-1b73d63538b1';
-const rcsAgent = 'VonageSales';
+const privateKey = process.env.VCR_PRIVATE_KEY;
+const applicationId = process.env.VCR_API_APPLICATION_ID;
+const rcsAgent = 'EOS';
 
 const secondsTillEndOfDay = () => {
   const now = DateTime.now().setZone('Europe/Berlin');

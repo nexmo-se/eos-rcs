@@ -5,3 +5,4 @@ vcr.yml
 private.key
 local/
 *.zip
+*.yml

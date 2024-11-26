@@ -8,8 +8,9 @@ const methodOverride = require('method-override');
 const passport = require('passport');
 const tps = parseInt(process.env.tps || '30', 10);
 const cookieSession = require('cookie-session');
-const { neru, Assets, Scheduler } = require('neru-alpha');
+const { neru, Assets, Scheduler, State } = require('neru-alpha');
 const whitelistRouter = require('./router/whitelist');
+const { vcr } = require('@vonage/vcr-sdk');
 
 const csvService = require('./services/csv');
 const smsService = require('./services/sms');
@@ -20,7 +21,9 @@ const initializePassport = require('./passport-strategy');
 const { default: axios } = require('axios');
 const blackListService = require('./services/blacklist');
 
-const globalState = neru.getGlobalState();
+// const globalState = vcr.getAccountState();
+const session = neru.getGlobalSession();
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`);
 const CRONJOB_DEFINITION_SCHEDULER = '0 9-20 * * 1-5';
 const TEMPLATES_TABLENAME = 'TEMPLATES';
 
@@ -47,13 +50,13 @@ app.use(methodOverride('_method'));
 initializePassport(
   passport,
   async (email) => {
-    const globalState = neru.getGlobalState();
+    // const globalState = neru.getGlobalState();
     const customer = await globalState.hget('users', email);
     return JSON.parse(customer);
     if (!customer) return null;
   },
   async (email) => {
-    const globalState = neru.getGlobalState();
+    // const globalState = neru.getGlobalState();
     const customer = await globalState.hget('users', email);
     return customer;
   }
@@ -124,6 +127,7 @@ app.get('/api/templates', async (req, res) => {
 app.get('/support', async (req, res) => {
   const isRcsSupported = await utils.checkRCS('34628124767');
   console.log(isRcsSupported);
+  console.log(process.env.apikey);
   res.send('okay');
 });
 
@@ -471,14 +475,14 @@ app.listen(process.env.NERU_APP_PORT || 3000, async () => {
   // console.log(schedulerCreated);
 
   const email = 'root@gmail.com';
-  await globalState.hset('users', {
-    [email]: JSON.stringify({
-      id: uuidv4(),
-      email: email,
-      name: 'Test',
-      password: '1234',
-    }),
-  });
+  // await globalState.hset('users', {
+  //   [email]: JSON.stringify({
+  //     id: uuidv4(),
+  //     email: email,
+  //     name: 'Test',
+  //     password: '1234',
+  //   }),
+  // });
 
   await globalState.set('processingState', false);
 });
