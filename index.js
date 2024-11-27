@@ -197,6 +197,7 @@ app.post('/inbound', async (req, res) => {
       if (text.toUpperCase() === 'STOP') {
         const response = await blackListService.blacklist(number);
         console.log(response);
+        smsService.sendSmsOrRcs(utils.rcsAgent, number, 'You are opted out', 'https://api.nexmo.com/v1/messages', 'opt-out', 'n/a', axios);
       }
       console.log('message received', req.body);
 

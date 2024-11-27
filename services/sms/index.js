@@ -18,11 +18,12 @@ const rateLimitAxios = rateLimiterService.newInstance(tps);
 const utils = require('../../utils');
 const blackListService = require('../blacklist/index');
 // neru tablename for processed filenames
-const { neru, Assets, Scheduler } = require('neru-alpha');
+const { neru, Assets, Scheduler, State } = require('neru-alpha');
 const apikey = process.env.apikey;
 const apiSecret = process.env.apiSecret;
 const api_url = 'https://api.nexmo.com/v1/messages';
-const globalState = neru.getAccountState();
+const session = neru.getGlobalSession();
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`);
 
 const sendAllMessages = async (records, filename) => {
   const csvName = filename.split('send/')[1];
