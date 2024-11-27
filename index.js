@@ -21,9 +21,10 @@ const initializePassport = require('./passport-strategy');
 const { default: axios } = require('axios');
 const blackListService = require('./services/blacklist');
 
-// const globalState = vcr.getAccountState();
+// const globalState = neru.getGlobalState();
 const session = neru.getGlobalSession();
 const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`);
+
 const CRONJOB_DEFINITION_SCHEDULER = '0 9-20 * * 1-5';
 const TEMPLATES_TABLENAME = 'TEMPLATES';
 
@@ -127,7 +128,6 @@ app.get('/api/templates', async (req, res) => {
 app.get('/support', async (req, res) => {
   const isRcsSupported = await utils.checkRCS('34628124767');
   console.log(isRcsSupported);
-  console.log(process.env.apikey);
   res.send('okay');
 });
 
@@ -270,6 +270,7 @@ async function processAllFiles(files, assets, scheduler) {
     console.log('processing file' + filename);
     try {
       const asset = await assets.getRemoteFile(filename).execute();
+      console.log(JSON.stringify(asset.toString()));
       records = csvService.fromCsvSync(asset.toString(), {
         columns: true,
         delimiter: ';',
@@ -415,6 +416,7 @@ app.post('/checkandsend', async (req, res) => {
     const assets = new Assets(session);
     const lastCheck = await globalState.get('lastCsvCheck');
     const processingFiles = await globalState.get('processingState');
+    console.log('processing files ? ' + processingFiles);
     // get file list from assets api
     const assetlist = await assets.list(FILETYPES, false, 10).execute();
     console.log(assetlist);

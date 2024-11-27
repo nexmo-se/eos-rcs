@@ -6,3 +6,4 @@ private.key
 local/
 *.zip
 *.yml
+vcr-eos.yml
