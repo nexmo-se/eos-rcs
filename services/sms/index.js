@@ -83,6 +83,33 @@ const sendAllMessages = async (records, filename) => {
   }
 };
 
+const sendOptOutRcs = async (senderNumber, to) => {
+  const headers = {
+    Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
+    'Content-Type': 'application/json',
+  };
+  const body = {
+    message_type: 'text',
+    from: senderNumber,
+    channel: 'rcs',
+    to: to,
+    text: 'You have been opted out. You will not receive more messages',
+    sms: { encoding_type: 'auto' },
+    client_ref: `opt-out`,
+  };
+  try {
+    const response = await axios.post(api_url, body, { headers });
+    return {
+      ...response.data,
+      // Include the channel in the returned object
+    };
+  } catch (error) {
+    console.error(error.response.data);
+    return { ...error.response.data, channel };
+    // return Promise.reject(error);
+  }
+};
+
 const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvName, axios, rcsTemplate) => {
   let channel = 'sms'; // Default channel is SMS
   let from = senderNumber || 'test';
@@ -134,4 +161,5 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
 module.exports = {
   sendSmsOrRcs,
   sendAllMessages,
+  sendOptOutRcs,
 };

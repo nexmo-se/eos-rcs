@@ -8,7 +8,7 @@ const methodOverride = require('method-override');
 const passport = require('passport');
 const tps = parseInt(process.env.tps || '30', 10);
 const cookieSession = require('cookie-session');
-const { neru, Assets, Scheduler, State } = require('neru-alpha');
+const { neru, Assets, Scheduler, State, Messages } = require('neru-alpha');
 const whitelistRouter = require('./router/whitelist');
 const { vcr } = require('@vonage/vcr-sdk');
 
@@ -24,6 +24,22 @@ const blackListService = require('./services/blacklist');
 // const globalState = neru.getGlobalState();
 const session = neru.getGlobalSession();
 const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`);
+
+const messaging = new Messages(session);
+
+const listenMessages = async () => {
+  await messaging
+    .listenMessages(
+      { type: null, number: null },
+      {
+        type: 'rcs',
+        number: null,
+      },
+      '/inbound'
+    )
+    .execute();
+};
+listenMessages();
 
 const CRONJOB_DEFINITION_SCHEDULER = '0 9-20 * * 1-5';
 const TEMPLATES_TABLENAME = 'TEMPLATES';
@@ -126,7 +142,7 @@ app.get('/api/templates', async (req, res) => {
   res.json(parsedTemplates);
 });
 app.get('/support', async (req, res) => {
-  const isRcsSupported = await utils.checkRCS('34628124767');
+  const isRcsSupported = await utils.checkRCS('491743306799');
   console.log(isRcsSupported);
   res.send('okay');
 });
@@ -196,8 +212,8 @@ app.post('/inbound', async (req, res) => {
       const text = req.body.text;
       if (text.toUpperCase() === 'STOP') {
         const response = await blackListService.blacklist(number);
-        console.log(response);
-        smsService.sendSmsOrRcs(utils.rcsAgent, number, 'You are opted out', 'https://api.nexmo.com/v1/messages', 'opt-out', 'n/a', axios);
+        const resultOptOut = await smsService.sendOptOutRcs(utils.rcsAgent, number);
+        console.log(resultOptOut);
       }
       console.log('message received', req.body);
 
@@ -206,6 +222,7 @@ app.post('/inbound', async (req, res) => {
       res.sendStatus(500);
     }
   } catch (e) {
+    console.log(e);
     res.sendStatus(500);
   }
 });

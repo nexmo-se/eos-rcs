@@ -5,5 +5,5 @@ vcr.yml
 private.key
 local/
 *.zip
-*.yml
+vcr.yml
 vcr-eos.yml

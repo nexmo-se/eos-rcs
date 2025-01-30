@@ -39,6 +39,7 @@ const checkRCS = async (to) => {
       'Content-Type': 'application/json',
     },
   });
+  console.log(response);
 
   if (response.ok) {
     return true;

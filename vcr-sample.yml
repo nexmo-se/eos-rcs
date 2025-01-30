@@ -1,0 +1,24 @@
+project:
+  name: rcs-sending
+instance:
+  name: prod
+  runtime: nodejs16
+  region: aws.euw1
+  application-id: 1232-2323-23232
+  capabilities:
+    - messages-v1
+  entrypoint:
+    - node
+    - index.js
+  scaling:
+    min-scale: 1
+    max-scale: 3
+  secrets:
+    - apikey
+    - apiSecret
+
+debug:
+  name: debug
+  entrypoint:
+    - node
+    - index.js
