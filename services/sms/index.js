@@ -93,7 +93,7 @@ const sendOptOutRcs = async (senderNumber, to) => {
     from: senderNumber,
     channel: 'rcs',
     to: to,
-    text: 'You have been opted out. You will not receive more messages',
+    text: 'Sie haben sich erfolgreich abgemeldet und werden keine RCS Nachrichten mehr zu diesem Vorgang erhalten.',
     sms: { encoding_type: 'auto' },
     client_ref: `opt-out`,
   };

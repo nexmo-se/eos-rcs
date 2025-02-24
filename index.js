@@ -141,10 +141,11 @@ app.get('/api/templates', async (req, res) => {
   });
   res.json(parsedTemplates);
 });
-app.get('/support', async (req, res) => {
-  const isRcsSupported = await utils.checkRCS('491743306799');
+app.get('/support/:phone', async (req, res) => {
+  const phone = req.params.phone;
+  const isRcsSupported = await utils.checkRCS(phone);
   console.log(isRcsSupported);
-  res.send('okay');
+  res.send(isRcsSupported);
 });
 
 // Get a single temaplte by id
