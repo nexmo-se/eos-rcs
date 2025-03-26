@@ -11,6 +11,7 @@ const cookieSession = require('cookie-session');
 const { neru, Assets, Scheduler, State, Messages } = require('neru-alpha');
 const whitelistRouter = require('./router/whitelist');
 const { vcr } = require('@vonage/vcr-sdk');
+const { PassThrough } = require("stream")
 
 const csvService = require('./services/csv');
 const smsService = require('./services/sms');
@@ -23,7 +24,7 @@ const blackListService = require('./services/blacklist');
 
 // const globalState = neru.getGlobalState();
 const session = neru.getGlobalSession();
-const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`);
+const globalState = new State(session, `application:873a1e9c-7b5b-4d35-84b1-d8ddaaf77875`);
 
 const messaging = new Messages(session);
 
@@ -289,14 +290,19 @@ async function processAllFiles(files, assets, scheduler) {
     console.log('processing file' + filename);
     try {
       const asset = await assets.getRemoteFile(filename).execute();
-      console.log(JSON.stringify(asset.toString()));
-      records = csvService.fromCsvSync(asset.toString(), {
+      const chunks = asset.pipe(new PassThrough());
+      let rawFileData = '';
+      for await (let chunk of chunks) {
+        rawFileData += chunk;
+      }
+      records = csvService.fromCsvSync(rawFileData, {
         columns: true,
         delimiter: ';',
         skip_empty_lines: true,
         skip_lines_with_error: true,
         relax_column_count_more: true,
       });
+			console.log("records: ", JSON.stringify(records));
     } catch (e) {
       console.log('there was an error parsing the csv file' + e);
       await globalState.set('processingState', false);
@@ -305,7 +311,7 @@ async function processAllFiles(files, assets, scheduler) {
     const secondsTillEndOfDay = utils.secondsTillEndOfDay();
     const secondsNeededToSend = parseInt((records.length - 1) / tps);
     //only send if there's enough time till the end of the working day
-    if (secondsTillEndOfDay > secondsNeededToSend && utils.timeNow() >= 7) {
+    if (secondsTillEndOfDay > secondsNeededToSend){// && utils.timeNow() >= 7) {
       try {
         await globalState.set('processingState', true);
         const newCheck = new Date().toISOString();
@@ -314,6 +320,7 @@ async function processAllFiles(files, assets, scheduler) {
         const startProcessingDate = new Date().toISOString();
         console.log('file name: ' + filename);
         const sendingResults = await smsService.sendAllMessages(records, filename);
+				console.log('sendingResults: ' + sendingResults);
         const endProcessingDate = new Date().toISOString();
         const failedResults = sendingResults.filter((result) => result.type);
         const failedSummary = [
@@ -496,14 +503,14 @@ app.listen(process.env.NERU_APP_PORT || 3000, async () => {
   // console.log(schedulerCreated);
 
   const email = 'root@gmail.com';
-  // await globalState.hset('users', {
-  //   [email]: JSON.stringify({
-  //     id: uuidv4(),
-  //     email: email,
-  //     name: 'Test',
-  //     password: '1234',
-  //   }),
-  // });
+  await globalState.hset('users', {
+    [email]: JSON.stringify({
+      id: uuidv4(),
+      email: email,
+      name: 'Test',
+      password: '1234',
+    }),
+  });
 
   await globalState.set('processingState', false);
 });
