@@ -55,12 +55,15 @@ const writeResults = async (results, path, header) => {
     header: header,
   })
   // if (results.length) {
-  csvWriter
+    await csvWriter
     .writeRecords(results) // returns a promise
     .then(() => {
-      console.log('...Done')
+      // console.log('...Done')
     })
     .catch((e) => console.log(`Something wrong while writting the output csv ${e}`))
+
+    console.log('...Done')
+    return;
 }
 
 const moveFile = (assets, pathFrom, pathTo, records, filename) => {

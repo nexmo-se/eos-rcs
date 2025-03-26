@@ -23,7 +23,7 @@ const apikey = process.env.apikey
 const apiSecret = process.env.apiSecret
 const api_url = 'https://api.nexmo.com/v1/messages'
 const session = vcr.getGlobalSession()
-const globalState = new State(session, `application:873a1e9c-7b5b-4d35-84b1-d8ddaaf77875`)
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const sendAllMessages = async (records, filename) => {
   const csvName = filename.split('send/')[1]

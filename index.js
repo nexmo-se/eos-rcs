@@ -22,7 +22,7 @@ const { default: axios } = require('axios')
 const blackListService = require('./services/blacklist')
 
 const session = vcr.getGlobalSession()
-const globalState = new State(session, `application:873a1e9c-7b5b-4d35-84b1-d8ddaaf77875`)
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const messaging = new Messages(session)
 
@@ -305,7 +305,7 @@ async function processAllFiles(files, assets, scheduler) {
     const secondsTillEndOfDay = utils.secondsTillEndOfDay()
     const secondsNeededToSend = parseInt((records.length - 1) / tps)
     //only send if there's enough time till the end of the working day
-    if (secondsTillEndOfDay > secondsNeededToSend){// && utils.timeNow() >= 7) {
+    if (secondsTillEndOfDay > secondsNeededToSend && utils.timeNow() >= 7) {
       try {
         await globalState.set('processingState', true)
         const newCheck = new Date().toISOString()
@@ -343,6 +343,7 @@ async function processAllFiles(files, assets, scheduler) {
         clearInterval(interval)
         // await keepAlive.deleteKeepAlive();
       } catch (e) {
+				console.error("Error sending message ", e.message || e)
         await globalState.set('processingState', false)
         clearInterval(interval)
         // await keepAlive.deleteKeepAlive();
@@ -479,9 +480,6 @@ app.listen(process.env.VCR_PORT || 3000, async () => {
     })
       */
   }
-
-
-
   await globalState.set('processingState', false)
 })
 
