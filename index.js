@@ -295,7 +295,7 @@ async function processAllFiles(files, assets, scheduler) {
         skip_lines_with_error: true,
         relax_column_count_more: true,
       })
-			console.log("records: ", JSON.stringify(records));
+			// console.log("records: ", JSON.stringify(records));
     } catch (e) {
       console.info('There was an error parsing the csv file: ', e.message || e)
       await globalState.set('processingState', false)
@@ -432,7 +432,7 @@ app.post('/checkandsend', async (req, res) => {
     console.log('processing files ? ' + processingFiles)
     // get file list from assets api
     const assetlist = await assets.list(FILETYPES, false, 10)
-    console.log(assetlist)
+    console.log(JSON.stringify(assetlist))
     let toBeProcessed = []
 
     if (!assetlist || !assetlist.res || assetlist.res.length <= 0) {
@@ -461,6 +461,22 @@ app.post('/checkandsend', async (req, res) => {
     res.sendStatus(200)
   } catch (e) {
     console.error('check and send error: ', e)
+    res.sendStatus(500)
+  }
+})
+
+app.post('/remove-blacklist', async (req, res) => {
+  try {
+    if (req.body && req.body.number) {
+      const number = req.body.number
+      const response = await blackListService.removeBlacklist(number)
+      console.log(response)
+      res.sendStatus(200)
+    } else {
+      res.sendStatus(500)
+    }
+  } catch (e) {
+    console.log(e)
     res.sendStatus(500)
   }
 })

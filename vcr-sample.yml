@@ -1,5 +1,5 @@
 project:
-  name: rcs-sending
+  name: eos-rcs-sending
 instance:
   name: prod
   runtime: nodejs16
