@@ -28,24 +28,26 @@ const generateToken = () => {
     exp: Math.floor(Date.now() / 1000) + 8 * 60 * 60, // 8 hours
   })
 }
-const checkRCS = async (to) => {
+const checkRCS = async (to, axios) => {
   const host = 'https://api.nexmo.com'
   const token = generateToken()
 
-  const response = await fetch(`${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/phones/${to}/capabilities`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
-  console.log(response)
-
-  if (response.ok) {
-    return true
+  try {
+    const response = await axios.get(
+      `${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/phones/${to}/capabilities`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    })
+    console.log(`to: ${to} ー checkRCS: true / response.data: ${JSON.stringify(response.data)}`);
+    return true;
+  } catch (error) {
+    if (error.response) {
+      console.log(`to: ${to} ー checkRCS: false / error.response | ${error.response.status} | ${JSON.stringify(error.response.data)}`);
+    }
+    return false;
   }
-
-  return false
 }
 
 const writeResults = async (results, path, header) => {

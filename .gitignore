@@ -8,3 +8,4 @@ local/
 vcr.yml
 vcr.local.yml
 vcr-eos.yml
+test.*

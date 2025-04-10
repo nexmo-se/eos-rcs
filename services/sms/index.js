@@ -23,9 +23,93 @@ const apikey = process.env.apikey
 const apiSecret = process.env.apiSecret
 const api_url = 'https://api.nexmo.com/v1/messages'
 const session = vcr.getGlobalSession()
-const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+const globalState = new State(session)//, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+
+const Bottleneck = require('bottleneck')
+
+
+// TODO: delete
+const { v4: uuidv4 } = require('uuid')
 
 const sendAllMessages = async (records, filename) => {
+  const csvName = filename.split('send/')[1]
+  const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
+  const parsedTemplates = Object.keys(templates).map((key) => {
+    const data = JSON.parse(templates[key])
+    return { ...data }
+  })
+
+  try {
+    let smsCount = 0
+    let rcsCount = 0
+    let blackListed = 0
+
+    const limiter = new Bottleneck({
+      maxConcurrent: 10,
+      minTime: 110
+    });
+
+    const wrapLimiter = async (record, i) => {
+      const wrapped = limiter.wrap(processARecord);
+      return await wrapped(record, i).then((result) => {
+        console.log(`Returned from processARecord | ${JSON.stringify(result)}`);
+        return Promise.resolve(result);
+      });
+    };
+    
+    const processARecord = async (record, i) => {
+      console.log(`\nProcessing record index | ${i}`);
+      try {
+        console.log("Processing record: ", JSON.stringify(record))
+        const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
+        let text = template?.text
+        const rcsTemplate = template?.rcsEnabled
+  
+        const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`
+        const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
+        const client_ref = record[CSV_ID_COLUMN_NAME]
+  
+        const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g
+        if (text) {
+          const matchArrays = [...text.matchAll(regexp)]
+          matchArrays.forEach((array) => {
+            text = text.replaceAll(array[0], record[`${array[1]}`])
+          })
+        }
+  
+        const client_ref_obj = { client_ref: client_ref }
+  
+        const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate)
+        console.log("sendSmsOrRcs result: ", JSON.stringify(result))
+
+        // Increment SMS or RCS count based on the channel
+        if (result.channel === 'sms') smsCount++
+        if (result.channel === 'rcs') rcsCount++
+        if (result.channel === 'blacklist') blackListed++
+  
+        console.log(`\nFinished processing record index | ${i}`);
+        return Promise.resolve(Object.assign({}, result, client_ref_obj))
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    };
+
+    const promises = records.map(wrapLimiter);
+    console.log(`\nPromises done`);
+    const limiterResult = await Promise.all(promises);
+    console.log(`limiterResult`, JSON.stringify(limiterResult));
+
+    // Add SMS and RCS counts to results summary
+    limiterResult.push({ smsCount, rcsCount, blackListed })
+
+    return limiterResult;
+  } catch (error) {
+    console.error(error)
+    return error
+  }
+}
+
+const sendAllMessagesV0 = async (records, filename) => {
   const csvName = filename.split('send/')[1]
   const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
   const parsedTemplates = Object.keys(templates).map((key) => {
@@ -119,7 +203,7 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
   }
 
   if (rcsTemplate) {
-    const isRcsSupported = await utils.checkRCS(to)
+    const isRcsSupported = await utils.checkRCS(to, axios)
     channel = isRcsSupported ? 'rcs' : 'sms'
     from = isRcsSupported ? utils.rcsAgent : from
   }
@@ -142,10 +226,16 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
   }
 
   try {
-    const response = await axios.post(apiUrl, body, { headers })
+    // const response = await axios.post(apiUrl, body, { headers })
+    // console.log("response.data: ", JSON.stringify(response.data))
+    // console.log("channel: ", channel)
+    // return {
+    //   ...response.data,
+    //   channel, // Include the channel in the returned object
+    // }
     return {
-      ...response.data,
-      channel, // Include the channel in the returned object
+      message_uuid: uuidv4(),
+      channel
     }
   } catch (error) {
     console.error(error.response.data)
