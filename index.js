@@ -22,7 +22,7 @@ const { default: axios } = require('axios')
 const blackListService = require('./services/blacklist')
 
 const session = vcr.getGlobalSession()
-const globalState = new State(session)//, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const messaging = new Messages(session)
 
@@ -305,7 +305,7 @@ async function processAllFiles(files, assets, scheduler) {
     const secondsTillEndOfDay = utils.secondsTillEndOfDay()
     const secondsNeededToSend = parseInt((records.length - 1) / tps)
     //only send if there's enough time till the end of the working day
-    if (secondsTillEndOfDay > secondsNeededToSend){// && utils.timeNow() >= 7) {
+    if (secondsTillEndOfDay > secondsNeededToSend && utils.timeNow() >= 7) {
       try {
         await globalState.set('processingState', true)
         const newCheck = new Date().toISOString()
@@ -453,10 +453,10 @@ app.post('/checkandsend', async (req, res) => {
         toBeProcessed.push('/' + file.name)
       } else {
         console.log('I will not send since the file is already processed or there are files being processed')
-        console.log("file: ", JSON.stringify(file));
-        console.log("lastCheck: ", lastCheck);
-        console.log("file.lastModified > lastCheck ? ", new Date(file.lastModified) > new Date(lastCheck))
-        console.log("processingFiles: ", processingFiles);
+        // console.log("file: ", JSON.stringify(file));
+        // console.log("lastCheck: ", lastCheck);
+        // console.log("file.lastModified > lastCheck ? ", new Date(file.lastModified) > new Date(lastCheck))
+        // console.log("processingFiles: ", processingFiles);
       }
     })
 

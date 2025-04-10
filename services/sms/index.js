@@ -23,13 +23,9 @@ const apikey = process.env.apikey
 const apiSecret = process.env.apiSecret
 const api_url = 'https://api.nexmo.com/v1/messages'
 const session = vcr.getGlobalSession()
-const globalState = new State(session)//, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const Bottleneck = require('bottleneck')
-
-
-// TODO: delete
-const { v4: uuidv4 } = require('uuid')
 
 const sendAllMessages = async (records, filename) => {
   const csvName = filename.split('send/')[1]
@@ -226,16 +222,12 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
   }
 
   try {
-    // const response = await axios.post(apiUrl, body, { headers })
+    const response = await axios.post(apiUrl, body, { headers })
     // console.log("response.data: ", JSON.stringify(response.data))
     // console.log("channel: ", channel)
-    // return {
-    //   ...response.data,
-    //   channel, // Include the channel in the returned object
-    // }
     return {
-      message_uuid: uuidv4(),
-      channel
+      ...response.data,
+      channel, // Include the channel in the returned object
     }
   } catch (error) {
     console.error(error.response.data)
