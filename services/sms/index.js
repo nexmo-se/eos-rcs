@@ -23,14 +23,13 @@ const apikey = process.env.apikey
 const apiSecret = process.env.apiSecret
 const api_url = 'https://api.nexmo.com/v1/messages'
 const session = vcr.getGlobalSession()
-const globalState = new State(session)//, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const Bottleneck = require('bottleneck')
-const { v4: uuidv4 } = require('uuid')
 
 // RCS check (bulk)
 //  => Returns array with string of RCS supported numbers
-const getRCSSupportedNumbersV2 = async (records) => {
+const getRCSSupportedNumbers = async (records) => {
   const token = utils.generateToken()
   console.log(`token: ${token}`);
   const users = records.map((record) => { return `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`; });
@@ -46,173 +45,7 @@ const getRCSSupportedNumbersV2 = async (records) => {
   return Promise.resolve(rcsSupportedNumbers)
 }
 
-// RCS check (individual)
-//  => Returns array with the modified records array, which has 'isRcsSupported' indicator
-const getRCSSupportedNumbers = async (records) => {
-  const rcsPromises = records.map(async (record) => {
-    const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
-    const rcsTemplate = template?.rcsEnabled
-    const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
-
-    if (rcsTemplate) {
-      console.log(`Checking RCS capability for : ${to}`);
-      record.isRcsSupported = await utils.checkRCS(to, token, rateLimitAxios)
-    }
-    return Promise.resolve(record)
-  })
-  const processedRecords = await Promise.all(rcsPromises)
-  console.log(`Records processed for RCS checking`);
-  return Promise.resolve(processedRecords)
-}
-
-// V3. Doesn't work
-const sendAllMessagesV3 = async (records, filename) => {
-  const csvName = filename.split('send/')[1]
-  const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
-  const parsedTemplates = Object.keys(templates).map((key) => {
-    const data = JSON.parse(templates[key])
-    return { ...data }
-  })
-
-  try {
-    let smsCount = 0
-    let rcsCount = 0
-    let blackListed = 0
-
-    // const processedRecords = await getRCSSupportedNumbers(records);
-    // const rcsSupportedNumbers = await getRCSSupportedNumbersV2(records);
-    const rcsSupportedNumbers = [];
-
-    // const promises = processedRecords.map(async (record) => {
-    const promises = records.map(async (record) => {
-      try {
-        const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
-        let text = template?.text
-        const rcsTemplate = template?.rcsEnabled
-
-        const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`
-        const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
-        const client_ref = record[CSV_ID_COLUMN_NAME]
-
-        const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g
-        if (text) {
-          const matchArrays = [...text.matchAll(regexp)]
-          matchArrays.forEach((array) => {
-            text = text.replaceAll(array[0], record[`${array[1]}`])
-          })
-        }
-
-        const client_ref_obj = { client_ref: client_ref }
-        const isRcsSupported = rcsTemplate ? rcsSupportedNumbers.includes(to) : false; // record.isRcsSupported
-
-        const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate, isRcsSupported)
-
-        // Increment SMS or RCS count based on the channel
-        if (result.channel === 'sms') smsCount++
-        if (result.channel === 'rcs') rcsCount++
-        if (result.channel === 'blacklist') blackListed++
-
-        return Promise.resolve(Object.assign({}, result, client_ref_obj))
-      } catch (error) {
-        console.error("records.map error: ", error);
-        return Promise.reject(error)
-      }
-    })
-
-    const results = await Promise.all(promises)
-
-    // Add SMS and RCS counts to results summary
-    results.push({ smsCount, rcsCount, blackListed })
-
-    return results
-  } catch (error) {
-    console.error("before records.map error: ", error);
-    return error
-  }
-}
-
-// V2. This works but slower because of the limiter.
-// Change the RCS check to match V3
-const sendAllMessagesV2 = async (records, filename) => {
-  const csvName = filename.split('send/')[1]
-  const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
-  const parsedTemplates = Object.keys(templates).map((key) => {
-    const data = JSON.parse(templates[key])
-    return { ...data }
-  })
-
-  try {
-    let smsCount = 0
-    let rcsCount = 0
-    let blackListed = 0
-
-    const limiter = new Bottleneck({
-      maxConcurrent: 1000,
-      minTime: 25
-    });
-
-    const wrapLimiter = async (record, i) => {
-      const wrapped = limiter.wrap(processARecord);
-      return await wrapped(record, i).then((result) => {
-        console.log(`Returned from processARecord | ${JSON.stringify(result)}`);
-        return Promise.resolve(result);
-      });
-    };
-    
-    const processARecord = async (record, i) => {
-      console.log(`\nProcessing record index | ${i}`);
-      try {
-        console.log("Processing record: ", JSON.stringify(record))
-        const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
-        let text = template?.text
-        const rcsTemplate = template?.rcsEnabled
-  
-        const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`
-        const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
-        const client_ref = record[CSV_ID_COLUMN_NAME]
-  
-        const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g
-        if (text) {
-          const matchArrays = [...text.matchAll(regexp)]
-          matchArrays.forEach((array) => {
-            text = text.replaceAll(array[0], record[`${array[1]}`])
-          })
-        }
-  
-        const client_ref_obj = { client_ref: client_ref }
-  
-        const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate)
-        console.log("sendSmsOrRcs result: ", JSON.stringify(result))
-
-        // Increment SMS or RCS count based on the channel
-        if (result.channel === 'sms') smsCount++
-        if (result.channel === 'rcs') rcsCount++
-        if (result.channel === 'blacklist') blackListed++
-  
-        console.log(`\nFinished processing record index | ${i}`);
-        return Promise.resolve(Object.assign({}, result, client_ref_obj))
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    };
-
-    const promises = records.map(wrapLimiter);
-    console.log(`\nPromises done`);
-    const limiterResult = await Promise.all(promises);
-    console.log(`limiterResult`, JSON.stringify(limiterResult));
-
-    // Add SMS and RCS counts to results summary
-    limiterResult.push({ smsCount, rcsCount, blackListed })
-
-    return limiterResult;
-  } catch (error) {
-    console.error(error)
-    return error
-  }
-}
-
-// V2.5 This works but slower because of the limiter.
-// Uses RCS check to bulk
+// V2.5 - This works, but slower because of the limiter. Uses Bulk RCS check
 const sendAllMessages = async (records, filename) => {
   const csvName = filename.split('send/')[1]
   const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
@@ -226,7 +59,7 @@ const sendAllMessages = async (records, filename) => {
     let rcsCount = 0
     let blackListed = 0
 
-    const rcsSupportedNumbers = await getRCSSupportedNumbersV2(records);
+    const rcsSupportedNumbers = await getRCSSupportedNumbers(records);
 
     const limiter = new Bottleneck({
       maxConcurrent: 1000,
@@ -294,65 +127,6 @@ const sendAllMessages = async (records, filename) => {
   }
 }
 
-// V1. This is the oldest version writtern by Javi. Doesn't work.
-const sendAllMessagesV1 = async (records, filename) => {
-  const csvName = filename.split('send/')[1]
-  const templates = await globalState.mapGetAll(TEMPLATES_TABLENAME)
-  const parsedTemplates = Object.keys(templates).map((key) => {
-    const data = JSON.parse(templates[key])
-    return { ...data }
-  })
-
-  try {
-    let smsCount = 0
-    let rcsCount = 0
-    let blackListed = 0
-
-    const promises = records.map(async (record) => {
-      try {
-        const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
-        let text = template?.text
-        const rcsTemplate = template?.rcsEnabled
-
-        const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`
-        const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
-        const client_ref = record[CSV_ID_COLUMN_NAME]
-
-        const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g
-        if (text) {
-          const matchArrays = [...text.matchAll(regexp)]
-          matchArrays.forEach((array) => {
-            text = text.replaceAll(array[0], record[`${array[1]}`])
-          })
-        }
-
-        const client_ref_obj = { client_ref: client_ref }
-
-        const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate)
-
-        // Increment SMS or RCS count based on the channel
-        if (result.channel === 'sms') smsCount++
-        if (result.channel === 'rcs') rcsCount++
-        if (result.channel === 'blacklist') blackListed++
-
-        return Promise.resolve(Object.assign({}, result, client_ref_obj))
-      } catch (error) {
-        return Promise.reject(error)
-      }
-    })
-
-    const results = await Promise.all(promises)
-
-    // Add SMS and RCS counts to results summary
-    results.push({ smsCount, rcsCount, blackListed })
-
-    return results
-  } catch (error) {
-    console.error(error)
-    return error
-  }
-}
-
 const sendOptOutRcs = async (senderNumber, to) => {
   const headers = {
     Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
@@ -390,7 +164,6 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
 
   if (rcsTemplate) {
     console.info(`rcsTemplate: true / to: ${to} / isRcsSupported ? ${isRcsSupported}`)
-    // isRcsSupported = await utils.checkRCS(to, null, axios)
     channel = isRcsSupported ? 'rcs' : 'sms'
     from = isRcsSupported ? utils.rcsAgent : from
   }
@@ -407,22 +180,17 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
   console.info(`body: ${JSON.stringify(body)}`)
   const isBlackListed = await blackListService.isBlackListed(to)
   if (isBlackListed) {
+    console.info(`${to} is blackListed`)
     return {
       message_id: 'Blacklisted number - User sent STOP',
       channel: 'blacklist',
     }
   }
-  console.info(`isBlackListed: ${isBlackListed}`)
 
   try {
-    // const response = await axios.post(apiUrl, body, { headers })
-    // return {
-    //   ...response.data,
-    //   channel, // Include the channel in the returned object
-    // }
-    console.info(`Dummy sent to messages API completed / to: ${to} / isRcsSupported ? ${isRcsSupported} / channel ? ${channel}`)
+    const response = await axios.post(apiUrl, body, { headers })
     return {
-      message_uuid: uuidv4(),
+      ...response.data,
       channel, // Include the channel in the returned object
     }
   } catch (error) {
