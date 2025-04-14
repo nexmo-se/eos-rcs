@@ -22,7 +22,9 @@ const { default: axios } = require('axios')
 const blackListService = require('./services/blacklist')
 
 const session = vcr.getGlobalSession()
-const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+const globalState = new State(session)//, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
+
+const VCR_URL = process.env.VCR_INSTANCE_PUBLIC_URL;
 
 const messaging = new Messages(session)
 
@@ -305,7 +307,7 @@ async function processAllFiles(files, assets, scheduler) {
     const secondsTillEndOfDay = utils.secondsTillEndOfDay()
     const secondsNeededToSend = parseInt((records.length - 1) / tps)
     //only send if there's enough time till the end of the working day
-    if (secondsTillEndOfDay > secondsNeededToSend && utils.timeNow() >= 7) {
+    if (secondsTillEndOfDay > secondsNeededToSend){// && utils.timeNow() >= 7) {
       try {
         await globalState.set('processingState', true)
         const newCheck = new Date().toISOString()
@@ -363,7 +365,8 @@ async function processAllFiles(files, assets, scheduler) {
         //send the messages until the end of the allowed period
         try {
           interval = setInterval(() => {
-            axios.get(`http://${process.env.INSTANCE_SERVICE_NAME}.neru/keepalive`)
+            // axios.get(`http://${process.env.INSTANCE_SERVICE_NAME}.neru/keepalive`)
+            axios.get(`${VCR_URL}/keepalive`)
           }, 1000)
           // if (schedulers.list.indexOf('keepalive') !== -1) await keepAlive.createKeepAlive();
         } catch (e) {
@@ -487,8 +490,8 @@ app.post('/remove-blacklist', async (req, res) => {
 
 app.listen(process.env.VCR_PORT || 3000, async () => {
   console.log(`listening on port ${process.env.VCR_PORT}!`)
-  if (process.env.VCR_DEBUG == "true") {
-    /*
+  // if (process.env.VCR_DEBUG == "true") {
+    
     const email = 'toni.kuschan@vonage.com'
     await globalState.mapSet('users', {
       [email]: JSON.stringify({
@@ -498,8 +501,8 @@ app.listen(process.env.VCR_PORT || 3000, async () => {
         password: '1234',
       }),
     })
-      */
-  }
+      
+  // }
   await globalState.set('processingState', false)
 })
 
