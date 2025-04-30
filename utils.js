@@ -28,8 +28,9 @@ const generateToken = () => {
     exp: Math.floor(Date.now() / 1000) + 8 * 60 * 60, // 8 hours
   })
 }
+
 const checkRCS = async (to, token, axios) => {
-  const host = 'https://api.nexmo.com'
+  const host = 'https://api-eu.nexmo.com'
   if (!token) {
     token = generateToken()
   }
@@ -42,24 +43,24 @@ const checkRCS = async (to, token, axios) => {
         'Content-Type': 'application/json',
       }
     })
-    console.log(`to: ${to} ー checkRCS: true / response.data: ${JSON.stringify(response.data)}`);
+    // console.log(`to: ${to} ー checkRCS: true / response.data: ${JSON.stringify(response.data)}`);
     return true;
   } catch (error) {
     if (error.response) {
-      console.log(`to: ${to} ー checkRCS: false / error.response | ${error.response.status} | ${JSON.stringify(error.response.data)}`);
+      // console.log(`to: ${to} ー checkRCS: false / error.response | ${error.response.status} | ${JSON.stringify(error.response.data)}`);
     }
     return false;
   }
 }
 const checkRCSBulk = async (users, token, axios) => {
-  const host = 'https://api.nexmo.com'
+  const host = 'https://api-eu.nexmo.com'
   if (!token) {
     token = generateToken()
   }
 
   try {
     const response = await axios.post(
-      `${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/phones/users:batchGet`,
+      `${host}/v1/channel-manager/rcs/agents/${rcsAgent}/google/users:batchGet`,
       {
         users
       }, {
@@ -72,7 +73,7 @@ const checkRCSBulk = async (users, token, axios) => {
     return response.data.reachableUsers
   } catch (error) {
     if (error.response) {
-      console.log(`checkRCSBulk / error.response | ${error.response.status} | ${JSON.stringify(error.response.data)}`);
+      console.log(`checkRCSBulk / error.response | ${error.response.status} | ${JSON.stringify(error.response.data)} | users.length: ${users.length}`);
     }
     return []
   }

@@ -7,5 +7,7 @@ local/
 *.zip
 vcr.yml
 vcr.local.yml
-vcr-eos.yml
-test.*
+vcr.eos.yml
+test.js
+users.js
+*.log

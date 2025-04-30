@@ -26,23 +26,61 @@ const session = vcr.getGlobalSession()
 const globalState = new State(session, `application:f5897b48-9fab-4297-afb5-504d3b9c3296`)
 
 const Bottleneck = require('bottleneck')
+const { v4: uuidv4 } = require('uuid')
 
 // RCS check (bulk)
 //  => Returns array with string of RCS supported numbers
 const getRCSSupportedNumbers = async (records) => {
   const token = utils.generateToken()
-  console.log(`token: ${token}`);
+  // console.log(`getRCSSupportedNumbers / token: ${token}`);
+
   const users = records.map((record) => { return `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`; });
   let rcsSupportedNumbers = [];
   for (let i = 0; i < users.length; i = i + 999) {
     const usersToCheck = users.slice(i, i + 999);
     console.log(`usersToCheck.length: ${usersToCheck.length}`);
-    // console.log(`usersToCheck: ${usersToCheck}`);
-    const resultNumbers = await utils.checkRCSBulk(usersToCheck, token, rateLimitAxios)
-    rcsSupportedNumbers = rcsSupportedNumbers.concat(resultNumbers);
+
+    if (usersToCheck.length > 500) {
+      const resultNumbers = await utils.checkRCSBulk(usersToCheck, token, rateLimitAxios)
+      rcsSupportedNumbers = rcsSupportedNumbers.concat(resultNumbers);
+      console.log(`[1] rcsSupportedNumbers array length: ${rcsSupportedNumbers.length}`);
+    } else {
+      console.log(`The rest of data is less than 500. Performing single checks now`);
+      let resultNumbers = [];
+      for (let j = i; j < usersToCheck.length; j++) {
+        const isRCSSupported = await utils.checkRCS(usersToCheck[j], token, rateLimitAxios)
+        if (isRCSSupported) resultNumbers.push(usersToCheck[j]);
+      }
+      rcsSupportedNumbers = rcsSupportedNumbers.concat(resultNumbers);
+      console.log(`[2] rcsSupportedNumbers array length: ${rcsSupportedNumbers.length}`);
+
+      i = users.length;
+    }
   }
-  console.log(`rcsSupportedNumbers array created: ${rcsSupportedNumbers} / ${rcsSupportedNumbers.length}`);
+  console.log(`final rcsSupportedNumbers array created: ${rcsSupportedNumbers.length}`);
   return Promise.resolve(rcsSupportedNumbers)
+}
+
+// RCS check (individual)
+//  => Returns array with the modified records array, which has 'isRcsSupported' indicator
+const getRCSSupportedNumbersV1 = async (parsedTemplates, records) => {
+  const token = await utils.generateToken()
+  console.log(`getRCSSupportedNumbers / token: ${token}`);
+
+  const rcsPromises = records.map(async (record) => {
+    const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
+    const rcsTemplate = template?.rcsEnabled
+    const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
+
+    if (rcsTemplate) {
+      // console.log(`Checking RCS capability for : ${to}`);
+      record.isRcsSupported = await utils.checkRCS(to, token, rateLimitAxios)
+    }
+    return Promise.resolve(record)
+  })
+  const processedRecords = await Promise.all(rcsPromises)
+  // console.log(`Records processed for RCS checking`);
+  return Promise.resolve(processedRecords)
 }
 
 // V2.5 - This works, but slower because of the limiter. Uses Bulk RCS check
@@ -60,6 +98,9 @@ const sendAllMessages = async (records, filename) => {
     let blackListed = 0
 
     const rcsSupportedNumbers = await getRCSSupportedNumbers(records);
+    // records = await getRCSSupportedNumbers(parsedTemplates, records);
+    // const token = await utils.generateToken()
+    // console.log(`sendAllMessages / token: ${token}`);
 
     const limiter = new Bottleneck({
       maxConcurrent: 1000,
@@ -69,15 +110,16 @@ const sendAllMessages = async (records, filename) => {
     const wrapLimiter = async (record, i) => {
       const wrapped = limiter.wrap(processARecord);
       return await wrapped(record, i).then((result) => {
-        console.log(`Returned from processARecord | ${JSON.stringify(result)}`);
+        // console.log(`Returned from processARecord | ${JSON.stringify(result)}`);
         return Promise.resolve(result);
       });
     };
     
     const processARecord = async (record, i) => {
-      console.log(`\nProcessing record index | ${i}`);
+      // console.log(`\nProcessing record index | ${i}`);
       try {
-        console.log("Processing record: ", JSON.stringify(record))
+        if (i % 1000 === 0) console.log("Processing record ", i, " / ", JSON.stringify(record))
+
         const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
         let text = template?.text
         const rcsTemplate = template?.rcsEnabled
@@ -96,16 +138,18 @@ const sendAllMessages = async (records, filename) => {
   
         const client_ref_obj = { client_ref: client_ref }
         const isRcsSupported = rcsTemplate ? rcsSupportedNumbers.includes(to) : false;
+        // const isRcsSupported = rcsTemplate ? record.isRcsSupported : false;
+        // const isRcsSupported = rcsTemplate ? await utils.checkRCS(to, token, rateLimitAxios) : false;
   
         const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate, isRcsSupported)
-        console.log("sendSmsOrRcs result: ", JSON.stringify(result))
+        if (i % 1000 === 0) console.log("sendSmsOrRcs result ", i, " / ", JSON.stringify(result))
 
         // Increment SMS or RCS count based on the channel
         if (result.channel === 'sms') smsCount++
         if (result.channel === 'rcs') rcsCount++
         if (result.channel === 'blacklist') blackListed++
   
-        console.log(`\nFinished processing record index | ${i}`);
+        // console.log(`\nFinished processing record index | ${i}`);
         return Promise.resolve(Object.assign({}, result, client_ref_obj))
       } catch (error) {
         return Promise.reject(error)
@@ -113,9 +157,9 @@ const sendAllMessages = async (records, filename) => {
     };
 
     const promises = records.map(wrapLimiter);
-    console.log(`\nPromises done`);
+    // console.log(`\nPromises done`);
     const limiterResult = await Promise.all(promises);
-    console.log(`limiterResult`, JSON.stringify(limiterResult));
+    // console.log(`limiterResult`, JSON.stringify(limiterResult));
 
     // Add SMS and RCS counts to results summary
     limiterResult.push({ smsCount, rcsCount, blackListed })
@@ -163,7 +207,7 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
   }
 
   if (rcsTemplate) {
-    console.info(`rcsTemplate: true / to: ${to} / isRcsSupported ? ${isRcsSupported}`)
+    // console.log(`rcsTemplate: true / to: ${to} / isRcsSupported ? ${isRcsSupported}`)
     channel = isRcsSupported ? 'rcs' : 'sms'
     from = isRcsSupported ? utils.rcsAgent : from
   }
@@ -177,20 +221,23 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
     sms: { encoding_type: 'auto' },
     client_ref: `${campaignName}-${csvName}`,
   }
-  console.info(`body: ${JSON.stringify(body)}`)
+  // console.log(`body: ${JSON.stringify(body)}`)
   const isBlackListed = await blackListService.isBlackListed(to)
   if (isBlackListed) {
-    console.info(`${to} is blackListed`)
+    console.log(`${to} is blackListed`)
     return {
       message_id: 'Blacklisted number - User sent STOP',
       channel: 'blacklist',
     }
   }
 
+  if (isRcsSupported) console.log(`RCS message will be sent to number ${to} with client_ref ${campaignName}-${csvName}`)
+
   try {
     const response = await axios.post(apiUrl, body, { headers })
     return {
       ...response.data,
+      // message_uuid: uuidv4(),
       channel, // Include the channel in the returned object
     }
   } catch (error) {
