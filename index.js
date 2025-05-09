@@ -209,7 +209,7 @@ app.post('/inbound', async (req, res) => {
         const resultOptOut = await smsService.sendOptOutRcs(utils.rcsAgent, number)
         console.log(resultOptOut)
       }
-      console.log('message received', req.body)
+      console.log('/inbound - message received: ', JSON.stringify(req.body))
 
       res.sendStatus(200)
     } else {
