@@ -34,7 +34,10 @@ const getRCSSupportedNumbers = async (records) => {
   const token = utils.generateToken()
   // console.log(`getRCSSupportedNumbers / token: ${token}`);
 
-  const users = records.map((record) => { return `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`; });
+  const modUsers = records.map((record) => { return `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`; });
+  console.log(`modUsers: ${modUsers.length}`);
+  const users = [...new Set(modUsers)];
+  console.log(`users (Set): ${users.length}`);
   let rcsSupportedNumbers = [];
   for (let i = 0; i < users.length; i = i + 999) {
     const usersToCheck = users.slice(i, i + 999);
@@ -210,7 +213,7 @@ const sendSmsOrRcs = async (senderNumber, to, text, apiUrl, campaignName, csvNam
       channel, // Include the channel in the returned object
     }
   } catch (error) {
-    console.error(error.response.data)
+    console.error("Sending Error: ", JSON.stringify(error.response.data))
     if (error.response != null && error.response.status === 429) {
       console.log('Too many requests (429), retrying...')
       // return sendSmsOrRcs(to, text, apiUrl, campaignName, csvName, axios, rcsTemplate);
