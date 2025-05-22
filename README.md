@@ -1,20 +1,20 @@
-Neru EOS sample app
+VCR EOS sample app
 
 ## Pre-Requisites
 
 1. Install NodeJS
-2. Install [Neru CLI](https://vonage-neru.herokuapp.com/neru/overview)
+2. Install [VCR CLI](https://developer.vonage.com/en/vonage-cloud-runtime/getting-started/working-locally?source=vonage-cloud-runtime)
 
 ## Installation
 
 1. Run `npm install`
-2. Run `neru configure` where you will be asked to set apikey and secret (Nexmo).
-3. Create a `neru.yml` file as per `neru.sample.yml`
+2. Run `vcr configure` where you will be asked to set apikey and secret (Nexmo).
+3. Create a `vcr.yml` file as per `vcr.sample.yml`
 
-Next step is to configure the **appid** on Neru:
+Next step is to configure the **appid** on VCR:
 
 ```
-neru app configure --app-id your-app-id
+vcr app configure --app-id your-app-id
 
 ```
 
@@ -32,4 +32,4 @@ POST to `/scheduler` with {"command": "stop"}
 
 ## Debug
 
-To debug the service, you can run `neru debug`.
+To debug the service, you can run `vcr debug`.
