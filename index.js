@@ -202,15 +202,19 @@ app.post('/keepalivepinger', async (req, res) => {
 app.post('/inbound', async (req, res) => {
   try {
     if (req.body && req.body.from && req.body.text) {
+      console.log('/inbound - message received: ', JSON.stringify(req.body))
       const number = req.body.from
       const text = req.body.text
-      if (text.toUpperCase() === 'STOP') {
+      const opt_out_keywords = ['STOP', 'ABMELDEN', 'STOPP']
+      if (opt_out_keywords.includes(text.toUpperCase())) {
         const response = await blackListService.blacklist(number)
         const resultOptOut = await smsService.sendOptOutRcs(utils.rcsAgent, number)
         console.log(resultOptOut)
+      } else {
+        // send default reply to any other type of message
+        const resultSendDefaultAnswer = await smsService.sendDefaultRcsReply(utils.rcsAgent, number)
+        console.log(resultSendDefaultAnswer?.data || resultSendDefaultAnswer?.status || "Auto reply was sent.")
       }
-      console.log('/inbound - message received: ', JSON.stringify(req.body))
-
       res.sendStatus(200)
     } else {
       res.sendStatus(500)
