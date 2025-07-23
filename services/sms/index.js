@@ -91,7 +91,7 @@ const sendAllMessages = async (records, filename) => {
         return Promise.resolve(result);
       });
     };
-    
+
     const processARecord = async (record, i) => {
       try {
         if (i % 1000 === 0) console.log("Processing record ", i, " / ", JSON.stringify(record))
@@ -99,11 +99,11 @@ const sendAllMessages = async (records, filename) => {
         const template = parsedTemplates.find((template) => template.id === record[CSV_TEMPLATE_ID_COLUMN_NAME])
         let text = template?.text
         const rcsTemplate = template?.rcsEnabled
-  
+
         const senderNumber = `${record[`${template?.senderIdField}`]?.replaceAll('+', '')}`
         const to = `${record[CSV_PHONE_NUMBER_COLUMN_NAME]?.replaceAll('+', '')}`
         const client_ref = record[CSV_ID_COLUMN_NAME]
-  
+
         const regexp = /\{\{\s?([\w\d]+)\s?\}\}/g
         if (text) {
           const matchArrays = [...text.matchAll(regexp)]
@@ -111,10 +111,10 @@ const sendAllMessages = async (records, filename) => {
             text = text.replaceAll(array[0], record[`${array[1]}`])
           })
         }
-  
+
         const client_ref_obj = { client_ref: client_ref }
         const isRcsSupported = rcsTemplate ? rcsSupportedNumbers.includes(`+${to}`) : false;
-  
+
         const result = await sendSmsOrRcs(senderNumber, to, text, api_url, client_ref, csvName, rateLimitAxios, rcsTemplate, isRcsSupported)
         // if (i % 1000 === 0) console.log("sendSmsOrRcs result ", i, " / ", JSON.stringify(result))
 
@@ -122,7 +122,7 @@ const sendAllMessages = async (records, filename) => {
         if (result.channel === 'sms') smsCount++
         if (result.channel === 'rcs') rcsCount++
         if (result.channel === 'blacklist') blackListed++
-  
+
         // console.log(`\nFinished processing record index | ${i}`);
         return Promise.resolve(Object.assign({}, result, client_ref_obj))
       } catch (error) {
@@ -157,6 +157,67 @@ const sendOptOutRcs = async (senderNumber, to) => {
     text: 'Sie haben sich erfolgreich abgemeldet und werden keine RCS Nachrichten mehr zu diesem Vorgang erhalten.',
     sms: { encoding_type: 'auto' },
     client_ref: `opt-out`,
+  }
+  try {
+    const response = await axios.post(api_url, body, { headers })
+    return {
+      ...response.data,
+      // Include the channel in the returned object
+    }
+  } catch (error) {
+    console.error(error.response.data)
+    return { ...error.response.data, channel }
+    // return Promise.reject(error);
+  }
+}
+
+const sendDefaultRcsReply = async (from, to) => {
+  const headers = {
+    Authorization: `Bearer ${utils.generateToken()}`, // Use the JWT token parameter
+    'Content-Type': 'application/json',
+  }
+  const body = {
+    message_type: 'custom',
+    from,
+    to,
+    channel: 'rcs',
+    client_ref: 'default-reply',
+    "custom": {
+      "contentMessage": {
+        "richCard": {
+          "standaloneCard": {
+            "thumbnailImageAlignment": "LEFT",
+            "cardOrientation": "VERTICAL",
+            "cardContent": {
+              "title": "Vielen Dank für Ihre Nachricht!",
+              "description": "Leider können wir Antworten hier nicht bearbeiten. Bitte kontaktieren Sie uns über unsere Website oder rufen unseren Kundenservice an, um Unterstützung zu erhalten.",
+              "suggestions": [
+                {
+                  "action": {
+                    "text": "Jetzt kontaktieren",
+                    "postbackData": "https://www.eos-serviceportal.de/services/contactform_link_clicked",
+                    "openUrlAction": {
+                      "url": "https://www.eos-serviceportal.de/services/contactform",
+                      //"application": "WEBVIEW",
+                      //"webviewViewMode": "TALL"
+                    }
+                  }
+                },
+                {
+                  "action": {
+                    "text": "Jetzt anrufen",
+                    "postbackData": "+494028501023_call_clicked",
+                    "dialAction": {
+                      "phoneNumber": "+494028501023"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
   }
   try {
     const response = await axios.post(api_url, body, { headers })
@@ -227,4 +288,5 @@ module.exports = {
   sendSmsOrRcs,
   sendAllMessages,
   sendOptOutRcs,
+  sendDefaultRcsReply
 }
